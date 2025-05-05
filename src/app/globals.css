@@ -3,6 +3,9 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --vh: 1vh;
+  --keyboard-height: 0px;
+  --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 @theme inline {
@@ -36,4 +39,122 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
   overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Mobile-specific styles */
+@media screen and (max-width: 768px) {
+  .keyboard-open {
+    height: calc(100vh - var(--keyboard-height)) !important;
+  }
+
+  .chat-input-container {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: inherit;
+    padding: 8px;
+  }
+
+  .status-buttons,
+  .desktop-status-buttons {
+    display: none !important;
+  }
+
+  /* Hide status buttons on mobile */
+  .status-buttons {
+    display: none !important;
+  }
+
+  /* Always show timestamp on mobile */
+  .message-timestamp {
+    font-size: 0.625rem !important;
+    opacity: 0.7 !important;
+    margin-top: 2px !important;
+    margin-left: 4px !important;
+    color: rgba(156, 163, 175, 0.8) !important;
+    display: inline-block !important;
+  }
+
+  /* Smaller typing indicator on mobile */
+  .typing-indicator {
+    font-size: 0.625rem !important;
+    height: 1rem !important;
+    line-height: 1rem !important;
+    opacity: 0.7;
+    background: transparent !important;
+    padding: 0 !important;
+    margin-top: -0.75rem !important;
+  }
+
+  /* Adjust input area padding on mobile */
+  .chat-input-container {
+    padding: 0.5rem !important;
+  }
+
+  .chat-input-wrapper {
+    position: sticky;
+    bottom: 0;
+    background: inherit;
+    padding: 8px;
+    padding-bottom: calc(8px + var(--safe-area-inset-bottom));
+    z-index: 10;
+  }
+
+  /* Footer positioning */
+  .chat-footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: inherit;
+    padding-bottom: var(--safe-area-inset-bottom);
+    z-index: 20;
+  }
+
+  /* Hide desktop status buttons */
+  .desktop-status-buttons {
+    display: none !important;
+  }
+}
+
+/* Desktop hover styles - only apply on non-touch devices */
+@media (hover: hover) {
+  .message-timestamp {
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .message-container:hover .message-timestamp {
+    opacity: 0.7;
+  }
+}
+
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
+}
+
+.animate-bounce {
+  animation: bounce 0.6s infinite;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
 }

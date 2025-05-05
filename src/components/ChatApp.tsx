@@ -184,7 +184,7 @@ const ChatApp = memo(() => {
               }
             }}
             autoFocus={!!currentUser}
-            className={`flex-1 px-3 sm:px-4 py-1.5 sm:py-2 text-base border-y border-l rounded-l-full focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+            className={`flex-1 px-3 sm:px-4 py-1 sm:py-2 text-base border-y border-l rounded-l-full focus:outline-none focus:ring-2 focus:ring-blue-500 ${
               isDarkMode
                 ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
                 : "bg-white border-gray-300 text-gray-800 placeholder-gray-500"
@@ -192,12 +192,13 @@ const ChatApp = memo(() => {
             style={{
               willChange: "contents",
               transition: "all 0.2s ease-out",
-              minHeight: "40px",
+              minHeight: window.innerWidth < 768 ? "32px" : "36px",
               fontSize: "16px", // Prevent zoom on mobile
+              lineHeight: window.innerWidth < 768 ? "18px" : "22px",
             }}
           />
           <motion.button
-            className="px-3 sm:px-4 py-1.5 sm:py-2 bg-blue-500 text-white border-y border-r border-blue-500 rounded-r-full hover:bg-blue-600 focus:outline-none font-medium min-h-[40px] min-w-[60px]"
+            className="px-2 sm:px-3 py-1 sm:py-1.5 bg-blue-500 text-white border-y border-r border-blue-500 rounded-r-full hover:bg-blue-600 focus:outline-none font-medium min-h-[32px] sm:min-h-[36px] min-w-[50px] sm:min-w-[60px]"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={handleSendMessage}
@@ -207,8 +208,23 @@ const ChatApp = memo(() => {
           </motion.button>
 
           {localIsTyping && currentUser && (
-            <div className="absolute -top-6 left-4 text-xs text-gray-500 dark:text-gray-400 animate-fade-in">
-              You are typing...
+            <div
+              className={`absolute -top-5 left-4 flex items-center gap-1 py-1 px-2 rounded-full text-xs ${
+                isDarkMode
+                  ? "bg-gray-700/70 text-gray-300"
+                  : "bg-gray-100/90 text-gray-600"
+              } animate-fade-in backdrop-blur-sm transition-all duration-200`}
+              style={{
+                boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+                transform: "translateY(-2px)",
+              }}
+            >
+              <div className="flex gap-1">
+                <span className="w-1 h-1 rounded-full bg-blue-500 animate-bounce [animation-delay:-0.3s]"></span>
+                <span className="w-1 h-1 rounded-full bg-blue-500 animate-bounce [animation-delay:-0.15s]"></span>
+                <span className="w-1 h-1 rounded-full bg-blue-500 animate-bounce"></span>
+              </div>
+              <span className="ml-1 text-[11px]">typing...</span>
             </div>
           )}
         </div>
@@ -1328,7 +1344,7 @@ const ChatApp = memo(() => {
       currentUser,
       messagesEndRef,
       formatTimestamp,
-      handleEmojiReaction, // Add this prop
+      handleEmojiReaction,
     }: MessageComponentProps) => {
       const [isEmojiPickerActive, setIsEmojiPickerActive] = useState(false);
       const [localReactions, setLocalReactions] = useState(
@@ -1366,21 +1382,21 @@ const ChatApp = memo(() => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
-          className={`flex items-start space-x-2 mb-4 group ${isCurrentUser ? "flex-row-reverse" : ""}`}
+          className={`message-container flex items-start space-x-2 mb-3 group ${isCurrentUser ? "flex-row-reverse" : ""}`}
           onHoverStart={() => setIsHovered(true)}
           onHoverEnd={() => setIsHovered(false)}
         >
-          <div className="relative">
+          <div className="relative flex-shrink-0">
             <Image
               src={sender.avatar}
               alt={sender.name}
-              width={32}
-              height={32}
-              className="h-8 w-8 rounded-full flex-shrink-0 transition-transform duration-200 hover:scale-110"
+              width={28}
+              height={28}
+              className="h-7 w-7 rounded-full transition-transform duration-200 hover:scale-110"
             />
             {sender.status === "online" && (
               <motion.div
-                className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-green-500 border-2 border-white dark:border-gray-800"
+                className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-green-500 border-2 border-white dark:border-gray-800"
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
                 transition={{ duration: 0.2 }}
@@ -1389,47 +1405,46 @@ const ChatApp = memo(() => {
           </div>
 
           <div
-            className={`flex flex-col ${isCurrentUser ? "items-end" : "items-start"} max-w-[70%]`}
+            className={`flex flex-col ${isCurrentUser ? "items-end" : "items-start"} max-w-[75%]`}
           >
-            <motion.div
-              className={`px-4 py-2 rounded-2xl ${
-                isCurrentUser
-                  ? darkMode
-                    ? "bg-blue-600 text-white"
-                    : "bg-blue-500 text-white"
-                  : darkMode
-                    ? "bg-gray-700 text-white"
-                    : "bg-gray-100 text-gray-800"
-              } shadow-sm hover:shadow-md transition-shadow duration-200 cursor-pointer`}
-              whileHover={{ scale: 1.02 }}
-              transition={{ type: "spring", stiffness: 400, damping: 30 }}
-              onClick={() => setIsEmojiPickerActive(!isEmojiPickerActive)}
-            >
-              <p className="whitespace-pre-wrap break-words text-sm md:text-base">
-                {initialMessage.text}
-              </p>
-
-              {/* Message Status */}
-              <div
-                className={`flex items-center justify-end space-x-1 mt-1 text-xs ${
-                  isCurrentUser ? "text-blue-200" : "text-gray-400"
-                }`}
+            <div className="flex items-end gap-1">
+              <motion.div
+                className={`px-3 py-1.5 rounded-2xl ${
+                  isCurrentUser
+                    ? darkMode
+                      ? "bg-blue-600 text-white"
+                      : "bg-blue-500 text-white"
+                    : darkMode
+                      ? "bg-gray-700 text-white"
+                      : "bg-gray-100 text-gray-800"
+                } shadow-sm hover:shadow-md transition-shadow duration-200 cursor-pointer`}
+                whileHover={{ scale: 1.02 }}
+                transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                onClick={() => setIsEmojiPickerActive(!isEmojiPickerActive)}
               >
+                <p className="whitespace-pre-wrap break-words text-sm">
+                  {initialMessage.text}
+                </p>
+              </motion.div>
+
+              <div className="flex flex-col items-end justify-end mb-1 min-w-[50px]">
                 {isCurrentUser && (
-                  <motion.span
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.2 }}
+                  <span
+                    className={`text-xs mb-0.5 ${isCurrentUser ? "text-blue-300" : "text-gray-400"}`}
                   >
                     {initialMessage.status === "sent" && "✓"}
                     {initialMessage.status === "delivered" && "✓✓"}
                     {initialMessage.status === "read" && (
                       <span className="text-blue-400">✓✓</span>
                     )}
-                  </motion.span>
+                  </span>
                 )}
+
+                <span className="message-timestamp text-[10px] text-gray-400">
+                  {formatTimestamp(initialMessage.timestamp)}
+                </span>
               </div>
-            </motion.div>
+            </div>
 
             {/* Emoji Picker */}
             {isEmojiPickerActive && (
@@ -1447,7 +1462,7 @@ const ChatApp = memo(() => {
                     whileHover={{ scale: 1.2 }}
                     whileTap={{ scale: 0.9 }}
                     className={`w-8 h-8 rounded-full flex items-center justify-center text-xl
-                  ${darkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"}`}
+                      ${darkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"}`}
                     onClick={(e) => {
                       e.stopPropagation();
                       handleEmojiClick(emoji);
@@ -1458,15 +1473,6 @@ const ChatApp = memo(() => {
                 ))}
               </motion.div>
             )}
-
-            {/* Timestamp with hover effect */}
-            <motion.span
-              className={`text-xs text-gray-500 mt-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200`}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: isHovered ? 1 : 0 }}
-            >
-              {formatTimestamp(initialMessage.timestamp)}
-            </motion.span>
 
             {/* Reactions */}
             {Object.keys(localReactions).length > 0 && (
