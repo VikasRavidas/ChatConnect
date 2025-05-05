@@ -21,24 +21,6 @@ const poppins = Poppins({
 
 // Wrap the entire component with memo to prevent unnecessary re-renders
 const ChatApp = memo(() => {
-  // Add a state to track if component is mounted (client-side only)
-  const [messageId, setMessageId] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-
-  useEffect(() => {
-    setMessageId(`msg-${Date.now()}-${Math.floor(Math.random() * 1000)}`);
-  }, []);
-  const [isMounted, setIsMounted] = useState(false);
-  // Add state for auto-scroll button
-  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
-  // Use useEffect to set mounted state after initial render (client-side only)
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
-  useEffect(() => {
-    setIsLoading(true);
-  }, []);
   // TypeScript Interfaces
   interface User {
     id: string;
@@ -80,15 +62,129 @@ const ChatApp = memo(() => {
     currentUser: User | null;
     messagesEndRef: React.MutableRefObject<HTMLDivElement | null>;
     formatTimestamp: (date: Date) => string;
-    handleEmojiReaction: (messageId: string, emoji: string) => void; // Add this prop
+    handleEmojiReaction: (messageId: string, emoji: string) => void;
   }
 
-  // References for scroll event handling
+  // States
+  const [messageId, setMessageId] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [users, setUsers] = useState<User[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [isTyping, setIsTyping] = useState(false);
+  const [activeEmojiMessage, setActiveEmojiMessage] = useState<string | null>(
+    null
+  );
+  const [showLoginModal, setShowLoginModal] = useState(true);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [darkMode, setDarkMode] = useState(false);
+  const [notificationSound, setNotificationSound] = useState(true);
+  const [typingTimeout, setTypingTimeout] = useState<NodeJS.Timeout | null>(
+    null
+  );
+  const [showSidebar, setShowSidebar] = useState(false);
+  const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<Message[]>([]);
+  const [currentSearchIndex, setCurrentSearchIndex] = useState(-1);
+  const [showSearch, setShowSearch] = useState(false);
+
+  // Emojis for reactions
+  const emojis = ["👍", "❤️", "😂", "😮", "😢", "😡"] as const;
+  type EmojiType = (typeof emojis)[number];
+
+  // Toggle sidebar with throttling
+  const toggleSidebar = useCallback(() => {
+    const now = Date.now();
+    if (now - lastRenderRef.current < 300) {
+      // If less than 300ms has passed, queue the toggle
+      if (throttleTimeoutRef.current) {
+        clearTimeout(throttleTimeoutRef.current);
+      }
+      throttleTimeoutRef.current = setTimeout(() => {
+        setShowSidebar((prev) => !prev);
+        lastRenderRef.current = Date.now();
+      }, 300) as unknown as NodeJS.Timeout;
+      return;
+    }
+    // Otherwise toggle immediately
+    setShowSidebar((prev) => !prev);
+    lastRenderRef.current = now;
+  }, []);
+
+  // References
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatInputRef = useRef<HTMLInputElement>(null);
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastKnownPositionRef = useRef({
     isAtBottom: true,
     showScrollButton: false,
   });
+  const lastRenderRef = useRef<number>(Date.now());
+  const throttleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const prevMessageCountRef = useRef(0);
+
+  useEffect(() => {
+    setMessageId(`msg-${Date.now()}-${Math.floor(Math.random() * 1000)}`);
+  }, []);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  useEffect(() => {
+    setIsLoading(true);
+  }, []);
+
+  // Separate the search logic
+  const performSearch = useCallback(
+    (query: string) => {
+      if (!query.trim()) {
+        setSearchResults([]);
+        setCurrentSearchIndex(-1);
+        return;
+      }
+
+      const results = messages.filter((message) =>
+        message.text.toLowerCase().includes(query.toLowerCase())
+      );
+      setSearchResults(results);
+      setCurrentSearchIndex(results.length > 0 ? 0 : -1);
+
+      // Scroll to first result if found
+      if (results.length > 0) {
+        const messageElement = document.getElementById(
+          `message-${results[0].id}`
+        );
+        messageElement?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    },
+    [messages]
+  );
+
+  // Navigation between search results
+  const navigateSearch = useCallback(
+    (direction: "prev" | "next") => {
+      if (searchResults.length === 0) return;
+
+      let newIndex = currentSearchIndex;
+      if (direction === "next") {
+        newIndex = (currentSearchIndex + 1) % searchResults.length;
+      } else {
+        newIndex = currentSearchIndex - 1;
+        if (newIndex < 0) newIndex = searchResults.length - 1;
+      }
+
+      setCurrentSearchIndex(newIndex);
+      const messageElement = document.getElementById(
+        `message-${searchResults[newIndex].id}`
+      );
+      messageElement?.scrollIntoView({ behavior: "smooth", block: "center" });
+    },
+    [currentSearchIndex, searchResults]
+  );
 
   // Memoized ChatInput component to prevent unnecessary re-renders
   const ChatInput = memo(
@@ -302,132 +398,108 @@ const ChatApp = memo(() => {
     );
   });
 
-  // States
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [users, setUsers] = useState<User[]>([]);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [isTyping, setIsTyping] = useState(false);
-  // Track only which message has an active emoji picker (single state change)
-  const [activeEmojiMessage, setActiveEmojiMessage] = useState<string | null>(
-    null
-  );
-  const [showLoginModal, setShowLoginModal] = useState(true);
-  const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [darkMode, setDarkMode] = useState(false);
-  const [notificationSound, setNotificationSound] = useState(true);
-  const [typingTimeout, setTypingTimeout] = useState<NodeJS.Timeout | null>(
-    null
-  );
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const chatInputRef = useRef<HTMLInputElement>(null);
+  // Create SearchInput component to handle local state
+  const SearchInput = memo(
+    ({
+      onSearch,
+      darkMode,
+    }: {
+      onSearch: (query: string) => void;
+      darkMode: boolean;
+    }) => {
+      const [localSearchQuery, setLocalSearchQuery] = useState("");
+      const [isTyping, setIsTyping] = useState(false);
+      const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+      const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Add state for sidebar visibility on mobile
-  const [showSidebar, setShowSidebar] = useState(false);
-  // Add a state to track if auto-scrolling is needed
-  const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
-  // Add a ref to track the last render timestamp to throttle updates
-  const lastRenderRef = useRef<number>(Date.now());
-  // Add a throttle timeout ref
-  const throttleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+      // Handle local typing state
+      const handleTyping = useCallback(() => {
+        setIsTyping(true);
 
-  // Add initial state check to ensure sidebar is closed on mobile
-  useEffect(() => {
-    if (isMounted) {
-      // Force sidebar closed on mobile
-      if (window.innerWidth < 768) {
-        setShowSidebar(false);
-      }
-    }
-  }, [isMounted]);
-
-  // Add a useEffect to set body background color matching the theme - after darkMode is defined
-  useEffect(() => {
-    if (isMounted) {
-      // Set body background color to match the theme
-      if (darkMode) {
-        document.documentElement.classList.add("dark");
-        document.body.style.backgroundColor = "#111827"; // gray-900
-      } else {
-        document.documentElement.classList.remove("dark");
-        document.body.style.backgroundColor = "#f9fafb"; // gray-50
-      }
-    }
-    return () => {
-      if (isMounted) {
-        document.documentElement.classList.remove("dark");
-        document.body.style.backgroundColor = "";
-      }
-    };
-  }, [darkMode, isMounted]);
-
-  // Add a useEffect to fix body styles to prevent outer scrolling
-  useEffect(() => {
-    if (isMounted) {
-      // Fix body and html styles to prevent scrolling
-      document.body.style.overflow = "hidden";
-      document.documentElement.style.overflow = "hidden";
-      document.body.style.height = "100dvh";
-      document.body.style.margin = "0";
-      document.body.style.padding = "0";
-      document.documentElement.style.height = "100dvh";
-      document.body.style.position = "relative";
-      document.body.style.width = "100%";
-      document.body.style.overscrollBehavior = "none";
-
-      // Add CSS variable for accurate viewport height
-      const updateVhUnit = () => {
-        const vh = window.innerHeight * 0.01;
-        document.documentElement.style.setProperty("--vh", `${vh}px`);
-      };
-
-      // Initial call
-      updateVhUnit();
-
-      // Add event listener for resize
-      window.addEventListener("resize", updateVhUnit);
-
-      return () => {
-        if (isMounted) {
-          document.body.style.overflow = "";
-          document.documentElement.style.overflow = "";
-          document.body.style.height = "";
-          document.body.style.margin = "";
-          document.body.style.padding = "";
-          document.documentElement.style.height = "";
-          document.body.style.position = "";
-          document.body.style.width = "";
-          document.body.style.overscrollBehavior = "";
-
-          window.removeEventListener("resize", updateVhUnit);
+        // Clear existing typing timeout
+        if (typingTimeoutRef.current) {
+          clearTimeout(typingTimeoutRef.current);
         }
-      };
+
+        // Set new typing timeout
+        typingTimeoutRef.current = setTimeout(() => {
+          setIsTyping(false);
+          // Only search when user stops typing
+          if (searchTimeoutRef.current) {
+            clearTimeout(searchTimeoutRef.current);
+          }
+          onSearch(localSearchQuery);
+        }, 1000) as unknown as NodeJS.Timeout;
+      }, [localSearchQuery, onSearch]);
+
+      // Handle search input changes
+      const handleInputChange = useCallback(
+        (e: React.ChangeEvent<HTMLInputElement>) => {
+          const value = e.target.value;
+          setLocalSearchQuery(value);
+          handleTyping();
+        },
+        [handleTyping]
+      );
+
+      // Handle immediate search on Enter
+      const handleKeyDown = useCallback(
+        (e: React.KeyboardEvent<HTMLInputElement>) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            setIsTyping(false);
+            if (typingTimeoutRef.current) {
+              clearTimeout(typingTimeoutRef.current);
+            }
+            if (searchTimeoutRef.current) {
+              clearTimeout(searchTimeoutRef.current);
+            }
+            onSearch(localSearchQuery);
+          }
+        },
+        [localSearchQuery, onSearch]
+      );
+
+      // Cleanup timeouts
+      useEffect(() => {
+        return () => {
+          if (searchTimeoutRef.current) {
+            clearTimeout(searchTimeoutRef.current);
+          }
+          if (typingTimeoutRef.current) {
+            clearTimeout(typingTimeoutRef.current);
+          }
+        };
+      }, []);
+
+      return (
+        <div className="relative">
+          <input
+            type="text"
+            placeholder="Search messages..."
+            value={localSearchQuery}
+            onChange={handleInputChange}
+            onKeyDown={handleKeyDown}
+            className={`w-64 px-3 py-1.5 rounded-full text-sm border transition-colors duration-200
+            ${
+              darkMode
+                ? "bg-gray-800 border-gray-700 text-gray-200"
+                : "bg-white border-gray-200 text-gray-700"
+            } focus:outline-none focus:ring-2 focus:ring-blue-500`}
+          />
+          {isTyping && (
+            <div className="absolute right-3 top-1/2 -translate-y-1/2">
+              <div className="flex gap-1">
+                <div className="w-1 h-1 rounded-full bg-blue-500 animate-bounce [animation-delay:-0.3s]"></div>
+                <div className="w-1 h-1 rounded-full bg-blue-500 animate-bounce [animation-delay:-0.15s]"></div>
+                <div className="w-1 h-1 rounded-full bg-blue-500 animate-bounce"></div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
     }
-  }, [isMounted]);
-
-  // Toggle sidebar visibility with throttling
-  const toggleSidebar = useCallback(() => {
-    // Throttle sidebar toggling to prevent rapid state changes
-    const now = Date.now();
-    if (now - lastRenderRef.current < 300) {
-      // If less than 300ms has passed, queue the toggle
-      if (throttleTimeoutRef.current) {
-        clearTimeout(throttleTimeoutRef.current);
-      }
-
-      throttleTimeoutRef.current = setTimeout(() => {
-        setShowSidebar((prev) => !prev);
-        lastRenderRef.current = Date.now();
-      }, 300) as unknown as NodeJS.Timeout;
-      return;
-    }
-
-    // Otherwise toggle immediately
-    setShowSidebar((prev) => !prev);
-    lastRenderRef.current = now;
-  }, []);
-
-  // Emojis for reactions
-  const emojis = useMemo(() => ["👍", "❤️", "😂", "😮", "😢", "😡"], []);
+  );
 
   // Mock data for users
   const mockUsers: User[] = useMemo(
@@ -565,9 +637,6 @@ const ChatApp = memo(() => {
       }
     });
   }, []);
-
-  // Track previous message count to only scroll when new messages are added
-  const prevMessageCountRef = useRef(0);
 
   // Remove redundant initial scroll effect
   useEffect(() => {
@@ -978,54 +1047,108 @@ const ChatApp = memo(() => {
     setShowScrollToBottom(false);
   }, [scrollToBottom]);
 
-  // Navbar Component
+  // Navbar Component without animations
   const Navbar = () => {
     return (
       <div
-        className={`px-4 py-3 flex justify-between items-center z-10 ${
+        className={`px-4 py-3 flex justify-between items-center z-10 border-b ${
           darkMode
-            ? "bg-gray-900 text-white border-gray-700"
-            : "bg-gray-50 text-gray-800 border-gray-200"
+            ? "bg-gray-900/95 text-white border-gray-700"
+            : "bg-gray-50/95 text-gray-800 border-gray-200"
         }`}
-        style={{ opacity: 1 }}
+        style={{
+          backdropFilter: "blur(8px)",
+          WebkitBackdropFilter: "blur(8px)",
+        }}
       >
-        <div className="flex items-center space-x-2">
-          {/* Mobile sidebar toggle button */}
+        <div className="flex items-center space-x-3">
+          {/* Mobile sidebar toggle */}
           <button
-            className="md:hidden mr-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+            className="md:hidden mr-1 w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500"
             onClick={toggleSidebar}
             aria-label="Toggle sidebar"
           >
-            ☰
+            <span>☰</span>
           </button>
-          {/* Logo and title - removed button wrap */}
-          <div
-            className="text-2xl font-bold text-blue-500"
-            onClick={(e) => e.preventDefault()}
-            style={{ opacity: 1 }}
-          >
-            💬
+
+          {/* Logo and title */}
+          <div className="flex items-center space-x-2">
+            <div className="text-2xl font-bold text-blue-500">💬</div>
+            <div className="flex flex-col">
+              <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-500 to-purple-500">
+                ChatConnect
+              </h1>
+              <span className="text-xs text-gray-500 dark:text-gray-400 hidden sm:block">
+                Connect • Chat • Collaborate
+              </span>
+            </div>
           </div>
-          <h1 className="text-xl font-bold" style={{ opacity: 1 }}>
-            ChatConnect
-          </h1>
+
+          {/* Search Bar */}
+          {currentUser && (
+            <div className="hidden md:flex items-center ml-4">
+              <div className="flex items-center space-x-2">
+                <SearchInput onSearch={performSearch} darkMode={darkMode} />
+                {searchResults.length > 0 && (
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => navigateSearch("prev")}
+                      className={`p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                        darkMode ? "text-gray-300" : "text-gray-600"
+                      }`}
+                      disabled={!searchResults.length}
+                    >
+                      ↑
+                    </button>
+                    <span className="text-xs text-gray-500">
+                      {currentSearchIndex + 1}/{searchResults.length}
+                    </span>
+                    <button
+                      onClick={() => navigateSearch("next")}
+                      className={`p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                        darkMode ? "text-gray-300" : "text-gray-600"
+                      }`}
+                      disabled={!searchResults.length}
+                    >
+                      ↓
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-4">
           {currentUser && (
             <>
-              <div className="hidden md:flex items-center mr-4">
-                <span className="mr-2 text-sm font-medium">
+              {/* Team members display */}
+              <div className="hidden md:flex items-center space-x-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-green-500/10 to-blue-500/10">
+                <div className="flex -space-x-2">
+                  {users.slice(0, 3).map((user) => (
+                    <div key={user.id} className="relative">
+                      <Image
+                        src={user.avatar}
+                        alt={user.name}
+                        width={24}
+                        height={24}
+                        className="rounded-full border-2 border-white dark:border-gray-800"
+                      />
+                      {user.status === "online" && (
+                        <span className="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full bg-green-500 border-2 border-white dark:border-gray-800" />
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <span className="text-sm font-medium">
                   {getOnlineUsersCount()} online
                 </span>
-                <div className="h-2 w-2 rounded-full bg-green-500"></div>
               </div>
 
-              <div className="relative group">
+              {/* Profile button */}
+              <div className="relative">
                 <button
-                  className={`flex items-center space-x-2 px-3 py-1.5 rounded-full transition-all duration-300 ease-in-out
-                    border-2 border-transparent hover:border-blue-400 min-w-[40px] min-h-[40px]
-                    ${darkMode ? "hover:bg-gray-800" : "hover:bg-blue-50"}`}
+                  className="flex items-center space-x-2 px-3 py-1.5 rounded-full transition-colors border-2 border-transparent hover:border-blue-400/50"
                   onClick={() => setShowSettingsModal(true)}
                 >
                   <div className="relative">
@@ -1034,10 +1157,10 @@ const ChatApp = memo(() => {
                       alt={currentUser.name}
                       width={32}
                       height={32}
-                      className="h-8 w-8 rounded-full"
+                      className="h-8 w-8 rounded-full ring-2 ring-offset-2 ring-blue-500/30 dark:ring-offset-gray-800"
                     />
                     <span
-                      className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full ${
+                      className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-white dark:border-gray-800 ${
                         currentUser.status === "online"
                           ? "bg-green-500"
                           : currentUser.status === "busy"
@@ -1045,53 +1168,13 @@ const ChatApp = memo(() => {
                             : currentUser.status === "brb"
                               ? "bg-yellow-500"
                               : "bg-gray-400"
-                      } border border-white`}
-                    ></span>
+                      }`}
+                    />
                   </div>
                   <span className="font-medium hidden md:inline-block">
                     {currentUser.name}
                   </span>
                 </button>
-
-                <div className="absolute right-0 mt-2 hidden group-hover:block z-50">
-                  <div
-                    className={`py-1 rounded-xl shadow-lg w-48 overflow-hidden border ${
-                      darkMode
-                        ? "bg-gray-800 border-gray-700 text-gray-100"
-                        : "bg-white border-gray-200 text-gray-800"
-                    }`}
-                  >
-                    <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-                      <div className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">
-                        Set Status
-                      </div>
-                    </div>
-                    <div
-                      className={`px-4 py-2.5 flex items-center space-x-2 cursor-pointer transition-colors duration-200
-                        ${darkMode ? "hover:bg-gray-700" : "hover:bg-blue-50"}`}
-                      onClick={() => changeUserStatus("online")}
-                    >
-                      <div className="h-2.5 w-2.5 rounded-full bg-green-500"></div>
-                      <span>Online</span>
-                    </div>
-                    <div
-                      className={`px-4 py-2.5 flex items-center space-x-2 cursor-pointer transition-colors duration-200
-                        ${darkMode ? "hover:bg-gray-700" : "hover:bg-blue-50"}`}
-                      onClick={() => changeUserStatus("busy")}
-                    >
-                      <div className="h-2.5 w-2.5 rounded-full bg-red-500"></div>
-                      <span>Busy</span>
-                    </div>
-                    <div
-                      className={`px-4 py-2.5 flex items-center space-x-2 cursor-pointer transition-colors duration-200
-                        ${darkMode ? "hover:bg-gray-700" : "hover:bg-blue-50"}`}
-                      onClick={() => changeUserStatus("brb")}
-                    >
-                      <div className="h-2.5 w-2.5 rounded-full bg-yellow-500"></div>
-                      <span>Be Right Back</span>
-                    </div>
-                  </div>
-                </div>
               </div>
             </>
           )}
@@ -1356,6 +1439,32 @@ const ChatApp = memo(() => {
       if (!sender) return null;
 
       const isCurrentUser = currentUser?.id === sender.id;
+      const isSearchMatch =
+        searchQuery &&
+        initialMessage.text.toLowerCase().includes(searchQuery.toLowerCase());
+      const isCurrentSearchItem =
+        searchResults[currentSearchIndex]?.id === initialMessage.id;
+
+      // Highlight searched text
+      const renderHighlightedText = (text: string) => {
+        if (!searchQuery) return text;
+
+        const parts = text.split(new RegExp(`(${searchQuery})`, "gi"));
+        return parts.map((part, index) =>
+          part.toLowerCase() === searchQuery.toLowerCase() ? (
+            <span
+              key={index}
+              className={`bg-yellow-200 dark:bg-yellow-500/50 ${
+                isCurrentSearchItem ? "ring-2 ring-yellow-400" : ""
+              }`}
+            >
+              {part}
+            </span>
+          ) : (
+            part
+          )
+        );
+      };
 
       // Handle emoji selection
       const handleEmojiClick = (emoji: string) => {
@@ -1382,9 +1491,12 @@ const ChatApp = memo(() => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
-          className={`message-container flex items-start space-x-2 mb-3 group ${isCurrentUser ? "flex-row-reverse" : ""}`}
+          className={`message-container flex items-start space-x-2 mb-3 group ${
+            isCurrentUser ? "flex-row-reverse" : ""
+          } ${isSearchMatch ? "relative" : ""}`}
           onHoverStart={() => setIsHovered(true)}
           onHoverEnd={() => setIsHovered(false)}
+          id={`message-${initialMessage.id}`}
         >
           <div className="relative flex-shrink-0">
             <Image
@@ -1405,7 +1517,9 @@ const ChatApp = memo(() => {
           </div>
 
           <div
-            className={`flex flex-col ${isCurrentUser ? "items-end" : "items-start"} max-w-[75%]`}
+            className={`flex flex-col ${
+              isCurrentUser ? "items-end" : "items-start"
+            } max-w-[75%]`}
           >
             <div className="flex items-end gap-1">
               <motion.div
@@ -1417,20 +1531,26 @@ const ChatApp = memo(() => {
                     : darkMode
                       ? "bg-gray-700 text-white"
                       : "bg-gray-100 text-gray-800"
-                } shadow-sm hover:shadow-md transition-shadow duration-200 cursor-pointer`}
+                } shadow-sm hover:shadow-md transition-shadow duration-200 cursor-pointer ${
+                  isCurrentSearchItem
+                    ? "ring-2 ring-yellow-400 dark:ring-yellow-500"
+                    : ""
+                }`}
                 whileHover={{ scale: 1.02 }}
                 transition={{ type: "spring", stiffness: 400, damping: 30 }}
                 onClick={() => setIsEmojiPickerActive(!isEmojiPickerActive)}
               >
                 <p className="whitespace-pre-wrap break-words text-sm">
-                  {initialMessage.text}
+                  {renderHighlightedText(initialMessage.text)}
                 </p>
               </motion.div>
 
               <div className="flex flex-col items-end justify-end mb-1 min-w-[50px]">
                 {isCurrentUser && (
                   <span
-                    className={`text-xs mb-0.5 ${isCurrentUser ? "text-blue-300" : "text-gray-400"}`}
+                    className={`text-xs mb-0.5 ${
+                      isCurrentUser ? "text-blue-300" : "text-gray-400"
+                    }`}
                   >
                     {initialMessage.status === "sent" && "✓"}
                     {initialMessage.status === "delivered" && "✓✓"}
@@ -1479,18 +1599,45 @@ const ChatApp = memo(() => {
               <motion.div
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
-                className={`flex flex-wrap gap-1 mt-1 ${isCurrentUser ? "justify-end" : "justify-start"}`}
+                className={`flex flex-wrap gap-1 mt-1 ${
+                  isCurrentUser ? "justify-end" : "justify-start"
+                }`}
               >
-                {Object.entries(localReactions).map(([userId, emoji]) => (
-                  <motion.span
-                    key={`${initialMessage.id}-${userId}`}
-                    className="inline-flex items-center justify-center h-5 min-w-[20px] bg-gray-100 dark:bg-gray-700 rounded-full px-1 text-xs"
-                    whileHover={{ scale: 1.2 }}
-                    layout
-                  >
-                    {emoji}
-                  </motion.span>
-                ))}
+                {Object.entries(localReactions).map(([userId, emoji]) => {
+                  const isCurrentUserReaction = currentUser?.id === userId;
+                  return (
+                    <motion.span
+                      key={`${initialMessage.id}-${userId}`}
+                      className={`inline-flex items-center justify-center h-5 px-1.5 rounded-full
+                        ${
+                          isCurrentUserReaction
+                            ? darkMode
+                              ? "bg-blue-600/40 ring-1 ring-blue-500"
+                              : "bg-blue-100 ring-1 ring-blue-400"
+                            : darkMode
+                              ? "bg-gray-700"
+                              : "bg-gray-100"
+                        } 
+                        ${isCurrentUserReaction ? "text-sm" : "text-xs"}
+                        transition-all duration-200 hover:scale-110`}
+                      whileHover={{ scale: 1.1 }}
+                      layout
+                    >
+                      <span className={isCurrentUserReaction ? "mr-1" : ""}>
+                        {emoji}
+                      </span>
+                      {isCurrentUserReaction && (
+                        <span
+                          className={`text-[10px] ${
+                            darkMode ? "text-blue-300" : "text-blue-600"
+                          }`}
+                        >
+                          You
+                        </span>
+                      )}
+                    </motion.span>
+                  );
+                })}
               </motion.div>
             )}
           </div>
@@ -1746,137 +1893,148 @@ const ChatApp = memo(() => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+            className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
             onClick={() => setShowSettingsModal(false)}
           >
             <motion.div
-              initial={{ scale: 0.8, opacity: 0 }}
+              initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.8, opacity: 0 }}
-              className={`w-full max-w-md p-6 rounded-lg shadow-lg ${
+              exit={{ scale: 0.95, opacity: 0 }}
+              transition={{ type: "spring", duration: 0.3 }}
+              className={`w-full max-w-sm overflow-hidden rounded-2xl shadow-xl ${
                 darkMode ? "bg-gray-800 text-white" : "bg-white text-gray-800"
               }`}
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-bold">Settings</h2>
+              {/* Header */}
+              <div className="relative px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+                <h2 className="text-lg font-semibold text-center">Settings</h2>
                 <button
                   onClick={() => setShowSettingsModal(false)}
-                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                  className="absolute right-4 top-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
                 >
-                  ✕
+                  <span className="text-xl">×</span>
                 </button>
               </div>
 
-              <div className="space-y-6">
+              <div className="p-4 space-y-4">
+                {/* Profile Section */}
                 {currentUser && (
-                  <div className="flex items-center space-x-4">
-                    <Image
-                      src={currentUser.avatar}
-                      alt={currentUser.name}
-                      width={64}
-                      height={64}
-                      className="h-16 w-16 rounded-full"
-                    />
+                  <div className="flex items-center space-x-3 p-3 rounded-xl bg-gray-50 dark:bg-gray-700/50">
+                    <div className="relative">
+                      <Image
+                        src={currentUser.avatar}
+                        alt={currentUser.name}
+                        width={48}
+                        height={48}
+                        className="rounded-full ring-2 ring-offset-2 ring-blue-500/30 dark:ring-offset-gray-800"
+                      />
+                      <span
+                        className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white dark:border-gray-800 ${
+                          currentUser.status === "online"
+                            ? "bg-green-500"
+                            : currentUser.status === "busy"
+                              ? "bg-red-500"
+                              : currentUser.status === "brb"
+                                ? "bg-yellow-500"
+                                : "bg-gray-400"
+                        }`}
+                      />
+                    </div>
                     <div>
-                      <h3 className="font-bold text-lg">{currentUser.name}</h3>
-                      <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
-                        <span
-                          className={`h-2 w-2 rounded-full mr-2 ${
-                            currentUser.status === "online"
-                              ? "bg-green-500"
-                              : currentUser.status === "busy"
-                                ? "bg-red-500"
-                                : currentUser.status === "brb"
-                                  ? "bg-yellow-500"
-                                  : "bg-gray-400"
-                          }`}
-                        ></span>
-                        <span className="capitalize">{currentUser.status}</span>
+                      <div className="font-medium">{currentUser.name}</div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400 capitalize">
+                        {currentUser.status}
                       </div>
                     </div>
                   </div>
                 )}
 
-                <div className="space-y-4">
-                  <h3 className="font-medium">Status</h3>
-                  <div className="flex flex-wrap gap-2">
+                {/* Status Section */}
+                <div className="space-y-2">
+                  <label className="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                    Status
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
                     <motion.button
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
                       onClick={() => changeUserStatus("online")}
-                      className={`px-4 py-2 rounded-full text-sm font-medium ${
+                      className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
                         currentUser?.status === "online"
                           ? "bg-green-500 text-white"
-                          : "bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-white"
+                          : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
                       }`}
                     >
                       Online
                     </motion.button>
                     <motion.button
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => changeUserStatus("brb")}
+                      className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                        currentUser?.status === "brb"
+                          ? "bg-yellow-500 text-white"
+                          : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
+                      }`}
+                    >
+                      BRB
+                    </motion.button>
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
                       onClick={() => changeUserStatus("busy")}
-                      className={`px-4 py-2 rounded-full text-sm font-medium ${
+                      className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
                         currentUser?.status === "busy"
                           ? "bg-red-500 text-white"
-                          : "bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-white"
+                          : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
                       }`}
                     >
                       Busy
                     </motion.button>
-                    <motion.button
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={() => changeUserStatus("brb")}
-                      className={`px-4 py-2 rounded-full text-sm font-medium ${
-                        currentUser?.status === "brb"
-                          ? "bg-yellow-500 text-white"
-                          : "bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-white"
-                      }`}
-                    >
-                      Be Right Back
-                    </motion.button>
                   </div>
                 </div>
 
-                <div className="space-y-4">
-                  <h3 className="font-medium">Preferences</h3>
-                  <div className="space-y-3">
+                {/* Preferences Section */}
+                <div className="space-y-2">
+                  <label className="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                    Preferences
+                  </label>
+                  <div className="space-y-3 rounded-xl bg-gray-50 dark:bg-gray-700/50 p-3">
                     <div className="flex items-center justify-between">
-                      <span>Dark Mode</span>
+                      <span className="text-sm">Dark Mode</span>
                       <motion.button
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.9 }}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
                         onClick={toggleDarkMode}
-                        className={`w-12 h-6 rounded-full flex items-center transition-colors duration-300 focus:outline-none ${
+                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
                           darkMode ? "bg-blue-500" : "bg-gray-300"
                         }`}
                       >
                         <motion.div
                           layout
-                          className={`w-5 h-5 rounded-full bg-white shadow-md transform ${
-                            darkMode ? "translate-x-6" : "translate-x-1"
+                          className={`h-4 w-4 rounded-full bg-white shadow-sm transform transition-transform ${
+                            darkMode ? "translate-x-4" : "translate-x-0.5"
                           }`}
                         />
                       </motion.button>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span>Notification Sounds</span>
+                      <span className="text-sm">Notification Sounds</span>
                       <motion.button
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.9 }}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
                         onClick={toggleNotificationSound}
-                        className={`w-12 h-6 rounded-full flex items-center transition-colors duration-300 focus:outline-none ${
+                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
                           notificationSound ? "bg-blue-500" : "bg-gray-300"
                         }`}
                       >
                         <motion.div
                           layout
-                          className={`w-5 h-5 rounded-full bg-white shadow-md transform ${
+                          className={`h-4 w-4 rounded-full bg-white shadow-sm transform transition-transform ${
                             notificationSound
-                              ? "translate-x-6"
-                              : "translate-x-1"
+                              ? "translate-x-4"
+                              : "translate-x-0.5"
                           }`}
                         />
                       </motion.button>
@@ -1884,12 +2042,13 @@ const ChatApp = memo(() => {
                   </div>
                 </div>
 
-                <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+                {/* Logout Button */}
+                <div className="pt-2">
                   <motion.button
-                    whileHover={{ scale: 1.03 }}
-                    whileTap={{ scale: 0.98 }}
+                    whileHover={{ scale: 1.01 }}
+                    whileTap={{ scale: 0.99 }}
                     onClick={handleLogout}
-                    className="w-full py-2 rounded-lg bg-red-500 text-white font-medium hover:bg-red-600 focus:outline-none transition-colors"
+                    className="w-full py-2 rounded-lg bg-red-500 text-white text-sm font-medium hover:bg-red-600 focus:outline-none transition-colors"
                   >
                     Logout
                   </motion.button>
@@ -1921,7 +2080,7 @@ const ChatApp = memo(() => {
       className="h-screen w-full flex flex-col overflow-hidden bg-white"
       style={{
         backgroundColor: darkMode ? "#111827" : "#ffffff",
-        height: "calc(var(--vh, 1vh) * 100)", // Use CSS variable for height
+        height: "calc(var(--vh, 1vh) * 100)",
         maxHeight: "100dvh",
         overflowY: "hidden",
       }}
