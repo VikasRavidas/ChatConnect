@@ -6,11 +6,12 @@ import React, {
   useCallback,
   memo,
   useLayoutEffect,
-  use,
+  useMemo,
 } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { format } from "date-fns";
 import { Inter, Poppins } from "next/font/google";
+import Image from "next/image";
 
 const poppins = Poppins({
   subsets: ["latin"],
@@ -25,8 +26,8 @@ const ChatApp = memo(() => {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-  setMessageId(`msg-${Date.now()}-${Math.floor(Math.random() * 1000)}`);
-}, []);
+    setMessageId(`msg-${Date.now()}-${Math.floor(Math.random() * 1000)}`);
+  }, []);
   const [isMounted, setIsMounted] = useState(false);
   // Add state for auto-scroll button
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
@@ -35,10 +36,9 @@ const ChatApp = memo(() => {
     setIsMounted(true);
   }, []);
 
-  useEffect(() => { 
+  useEffect(() => {
     setIsLoading(true);
-  }
-    ,[]);
+  }, []);
   // TypeScript Interfaces
   interface User {
     id: string;
@@ -71,6 +71,16 @@ const ChatApp = memo(() => {
   interface LoginInputProps {
     onLogin: (name: string) => void;
     isDarkMode: boolean;
+  }
+
+  // Update the MessageComponentProps interface
+  interface MessageComponentProps {
+    message: Message;
+    darkMode: boolean;
+    currentUser: User | null;
+    messagesEndRef: React.MutableRefObject<HTMLDivElement | null>;
+    formatTimestamp: (date: Date) => string;
+    handleEmojiReaction: (messageId: string, emoji: string) => void; // Add this prop
   }
 
   // References for scroll event handling
@@ -115,7 +125,7 @@ const ChatApp = memo(() => {
         }, 3000);
 
         localTypingTimeoutRef.current = timeout as unknown as NodeJS.Timeout;
-      }, [currentUser, localIsTyping]);
+      }, [localIsTyping, currentUser]);
 
       // Handle sending the message
       const handleSendMessage = useCallback(() => {
@@ -148,7 +158,6 @@ const ChatApp = memo(() => {
         [handleSendMessage]
       );
 
-      
       return (
         <div className="flex items-center">
           <input
@@ -383,115 +392,122 @@ const ChatApp = memo(() => {
   }, []);
 
   // Emojis for reactions
-  const emojis = ["👍", "❤️", "😂", "😮", "😢", "😡"];
+  const emojis = useMemo(() => ["👍", "❤️", "😂", "😮", "😢", "😡"], []);
 
   // Mock data for users
-  const mockUsers: User[] = [
-    {
-      id: "user1",
-      name: "Alex Johnson",
-      avatar: "https://randomuser.me/api/portraits/men/32.jpg",
-      status: "online",
-      isTyping: false,
-    },
-    {
-      id: "user2",
-      name: "Samantha Lee",
-      avatar: "https://randomuser.me/api/portraits/women/44.jpg",
-      status: "online",
-      isTyping: false,
-    },
-    {
-      id: "user3",
-      name: "Michael Chen",
-      avatar: "https://randomuser.me/api/portraits/men/59.jpg",
-      status: "brb",
-      isTyping: false,
-    },
-    {
-      id: "user4",
-      name: "Jessica Taylor",
-      avatar: "https://randomuser.me/api/portraits/women/16.jpg",
-      status: "busy",
-      isTyping: false,
-    },
-    {
-      id: "user5",
-      name: "David Wilson",
-      avatar: "https://randomuser.me/api/portraits/men/7.jpg",
-      status: "offline",
-      lastSeen: new Date(Date.now() - 3600000),
-      isTyping: false,
-    },
-  ];
+  const mockUsers: User[] = useMemo(
+    () => [
+      {
+        id: "user1",
+        name: "Alex Johnson",
+        avatar: "https://randomuser.me/api/portraits/men/32.jpg",
+        status: "online",
+        isTyping: false,
+      },
+      {
+        id: "user2",
+        name: "Samantha Lee",
+        avatar: "https://randomuser.me/api/portraits/women/44.jpg",
+        status: "online",
+        isTyping: false,
+      },
+      {
+        id: "user3",
+        name: "Michael Chen",
+        avatar: "https://randomuser.me/api/portraits/men/59.jpg",
+        status: "brb",
+        isTyping: false,
+      },
+      {
+        id: "user4",
+        name: "Jessica Taylor",
+        avatar: "https://randomuser.me/api/portraits/women/16.jpg",
+        status: "busy",
+        isTyping: false,
+      },
+      {
+        id: "user5",
+        name: "David Wilson",
+        avatar: "https://randomuser.me/api/portraits/men/7.jpg",
+        status: "offline",
+        lastSeen: new Date(Date.now() - 3600000),
+        isTyping: false,
+      },
+    ],
+    []
+  );
 
   // Mock chat messages
-  const mockMessages: Message[] = [
-    {
-      id: "msg1",
-      senderId: "user1",
-      text: "Hey everyone! How's it going?",
-      timestamp: new Date(Date.now() - 3600000 * 3),
-      reactions: { user2: "👍", user4: "❤️" },
-      status: "sent",
-    },
-    {
-      id: "msg2",
-      senderId: "user2",
-      text: "Pretty good! Working on that new project. What about you?",
-      timestamp: new Date(Date.now() - 3600000 * 2.5),
-      reactions: {},
-      status: "sent",
-    },
-    {
-      id: "msg3",
-      senderId: "user3",
-      text: "I'm just taking a quick break. brb in 10 minutes!",
-      timestamp: new Date(Date.now() - 3600000 * 2),
-      reactions: { user1: "👍" },
-      status: "sent",
-    },
-    {
-      id: "msg4",
-      senderId: "user1",
-      text: "No worries, take your time!",
-      timestamp: new Date(Date.now() - 3600000 * 1.8),
-      reactions: {},
-      status: "sent",
-    },
-    {
-      id: "msg5",
-      senderId: "user4",
-      text: "Hey can someone help me with the new API documentation?",
-      timestamp: new Date(Date.now() - 3600000 * 1.5),
-      reactions: {},
-      status: "sent",
-    },
-    {
-      id: "msg6",
-      senderId: "user2",
-      text: "I can help! Give me a sec to find my notes.",
-      timestamp: new Date(Date.now() - 3600000 * 1.2),
-      reactions: { user4: "🙏" },
-      status: "sent",
-    },
-    {
-      id: "msg7",
-      senderId: "user1",
-      text: "Has anyone seen the latest deployment? Looks like there might be an issue with the authentication module.",
-      timestamp: new Date(Date.now() - 3600000 * 1),
-      reactions: { user2: "😮" },
-      status: "sent",
-    },
-    {
-      id: "msg8",
-      senderId: "user4",
-      text: "I'm checking it now. Will update everyone in a few minutes when I know more.",
-      timestamp: new Date(Date.now() - 3600000 * 0.5),
-      reactions: { user1: "👍", user2: "👍" },
-      status: "sent",
-    },
-  ];
+  const mockMessages: Message[] = useMemo(
+    () =>
+      [
+        {
+          id: "msg1",
+          senderId: "user1",
+          text: "Hey everyone! How's it going?",
+          timestamp: new Date(Date.now() - 3600000 * 3),
+          reactions: { user2: "👍", user4: "❤️" },
+          status: "sent",
+        },
+        {
+          id: "msg2",
+          senderId: "user2",
+          text: "Pretty good! Working on that new project. What about you?",
+          timestamp: new Date(Date.now() - 3600000 * 2.5),
+          reactions: {},
+          status: "sent",
+        },
+        {
+          id: "msg3",
+          senderId: "user3",
+          text: "I'm just taking a quick break. brb in 10 minutes!",
+          timestamp: new Date(Date.now() - 3600000 * 2),
+          reactions: { user1: "👍" },
+          status: "sent",
+        },
+        {
+          id: "msg4",
+          senderId: "user1",
+          text: "No worries, take your time!",
+          timestamp: new Date(Date.now() - 3600000 * 1.8),
+          reactions: {},
+          status: "sent",
+        },
+        {
+          id: "msg5",
+          senderId: "user4",
+          text: "Hey can someone help me with the new API documentation?",
+          timestamp: new Date(Date.now() - 3600000 * 1.5),
+          reactions: {},
+          status: "sent",
+        },
+        {
+          id: "msg6",
+          senderId: "user2",
+          text: "I can help! Give me a sec to find my notes.",
+          timestamp: new Date(Date.now() - 3600000 * 1.2),
+          reactions: { user4: "🙏" },
+          status: "sent",
+        },
+        {
+          id: "msg7",
+          senderId: "user1",
+          text: "Has anyone seen the latest deployment? Looks like there might be an issue with the authentication module.",
+          timestamp: new Date(Date.now() - 3600000 * 1),
+          reactions: { user2: "😮" },
+          status: "sent",
+        },
+        {
+          id: "msg8",
+          senderId: "user4",
+          text: "I'm checking it now. Will update everyone in a few minutes when I know more.",
+          timestamp: new Date(Date.now() - 3600000 * 0.5),
+          reactions: { user1: "👍", user2: "👍" },
+          status: "sent",
+        },
+      ] as Message[],
+    []
+  );
 
   // Initialize with mock data - client-side only
   useEffect(() => {
@@ -501,16 +517,17 @@ const ChatApp = memo(() => {
 
       // No longer force scrolling here since ChatWindow handles it
     }
-  }, [isMounted]);
+  }, [isMounted, mockMessages, mockUsers]);
 
   // Explicitly scroll to bottom (used after sending messages)
   const scrollToBottom = useCallback(() => {
-    // Only manually scroll when button is clicked
     requestAnimationFrame(() => {
-      messagesEndRef.current?.scrollIntoView({
-        behavior: "smooth",
-        block: "end",
-      });
+      if (messagesEndRef.current) {
+        messagesEndRef.current.scrollIntoView({
+          behavior: "smooth",
+          block: "end",
+        });
+      }
     });
   }, []);
 
@@ -639,7 +656,7 @@ const ChatApp = memo(() => {
       setTimeout(restoreScroll, 50);
       setTimeout(restoreScroll, 100);
     },
-    [currentUser]
+    []
   );
 
   // Add a reference to track the last status change time
@@ -691,12 +708,11 @@ const ChatApp = memo(() => {
 
   // Simulate response from another user
   const simulateResponse = useCallback(() => {
-    // Only run on client-side and when user exists
-    if (!isMounted || !currentUser) return;
+    const shouldRespond = new Date().getSeconds() % 3 === 0;
 
-    // Use a more deterministic approach instead of random
-    const shouldRespond = new Date().getSeconds() % 3 === 0; // Respond every 3 seconds
-    if (!shouldRespond) return;
+    if (!isMounted || !currentUser || !shouldRespond) {
+      return;
+    }
 
     const respondingUsers = users.filter(
       (user) => user.id !== currentUser.id && user.status === "online"
@@ -773,7 +789,9 @@ const ChatApp = memo(() => {
   // Update the sendMessage function to work with the new component
   const handleSendMessage = useCallback(
     (messageText: string) => {
-      if (!currentUser || !isMounted) return;
+      if (!currentUser || !isMounted) {
+        return;
+      }
 
       const messageId = `msg-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
       const newMessage: Message = {
@@ -803,11 +821,11 @@ const ChatApp = memo(() => {
     },
     [
       currentUser,
+      isMounted,
       scrollToBottom,
       simulateResponse,
       typingTimeout,
       updateUserTypingStatus,
-      isMounted,
     ]
   );
 
@@ -976,9 +994,11 @@ const ChatApp = memo(() => {
                   onClick={() => setShowSettingsModal(true)}
                 >
                   <div className="relative">
-                    <img
+                    <Image
                       src={currentUser.avatar}
                       alt={currentUser.name}
+                      width={32}
+                      height={32}
                       className="h-8 w-8 rounded-full"
                     />
                     <span
@@ -1079,9 +1099,11 @@ const ChatApp = memo(() => {
                 `}
               >
                 <div className="relative">
-                  <img
+                  <Image
                     src={user.avatar}
                     alt={user.name}
+                    width={40}
+                    height={40}
                     className="w-10 h-10 rounded-full border-2 border-transparent hover:border-blue-400"
                     loading="lazy"
                   />
@@ -1145,9 +1167,11 @@ const ChatApp = memo(() => {
                 `}
               >
                 <div className="relative">
-                  <img
+                  <Image
                     src={user.avatar}
                     alt={user.name}
+                    width={40}
+                    height={40}
                     className="w-10 h-10 rounded-full grayscale transition-all duration-300 hover:grayscale-0"
                     loading="lazy"
                   />
@@ -1285,285 +1309,166 @@ const ChatApp = memo(() => {
       currentUser,
       messagesEndRef,
       formatTimestamp,
-    }: {
-      message: Message;
-      darkMode: boolean;
-      currentUser: User | null;
-      messagesEndRef: React.RefObject<HTMLDivElement | null>;
-      formatTimestamp: (date: Date) => string;
-    }) => {
-      // Local state for emoji picker visibility
+      handleEmojiReaction, // Add this prop
+    }: MessageComponentProps) => {
       const [isEmojiPickerActive, setIsEmojiPickerActive] = useState(false);
-      // Local state for reactions to avoid parent re-renders
       const [localReactions, setLocalReactions] = useState(
         initialMessage.reactions
       );
-      const scrollPositionRef = useRef<number | null>(null);
+      const [isHovered, setIsHovered] = useState(false);
 
-      // Get the sender info
       const sender = getUserById(initialMessage.senderId);
       if (!sender) return null;
 
-      // Determine if current user's message
-      const isCurrentUser =
-        currentUser && initialMessage.senderId === currentUser.id;
+      const isCurrentUser = currentUser?.id === sender.id;
 
-      // Memoized emoji picker toggle handler
-      const handleEmojiPickerToggle = useCallback(
-        (e: React.MouseEvent) => {
-          // Prevent event propagation and default behavior
-          e.stopPropagation();
-          e.preventDefault();
+      // Handle emoji selection
+      const handleEmojiClick = (emoji: string) => {
+        if (!currentUser) return;
 
-          // Store current scroll position
-          const chatContainer = messagesEndRef.current?.parentElement;
-          if (chatContainer) {
-            scrollPositionRef.current = chatContainer.scrollTop;
+        // Update local state immediately for better UX
+        setLocalReactions((prev) => {
+          const newReactions = { ...prev };
+          if (newReactions[currentUser.id] === emoji) {
+            delete newReactions[currentUser.id];
+          } else {
+            newReactions[currentUser.id] = emoji;
           }
+          return newReactions;
+        });
 
-          // Toggle picker visibility with function form to ensure latest state
-          setIsEmojiPickerActive((prev) => !prev);
-
-          // Restore scroll position after state updates using RAF
-          requestAnimationFrame(() => {
-            if (chatContainer && scrollPositionRef.current !== null) {
-              chatContainer.scrollTop = scrollPositionRef.current;
-            }
-          });
-        },
-        [messagesEndRef]
-      );
-
-      // Memoized emoji selection handler with local state update
-      const handleEmojiSelection = useCallback(
-        (emoji: string) => {
-          if (!currentUser) return;
-
-          // Store current scroll position AND height for more accurate restoration
-          const chatContainer = messagesEndRef.current?.parentElement;
-          const prevScrollPosition = chatContainer?.scrollTop ?? 0;
-          const prevScrollHeight = chatContainer?.scrollHeight ?? 0;
-
-          // Update local reactions state (more efficient than parent state)
-          setLocalReactions((prevReactions) => {
-            const newReactions = { ...prevReactions };
-
-            // Toggle emoji reaction
-            if (newReactions[currentUser.id] === emoji) {
-              delete newReactions[currentUser.id];
-            } else {
-              newReactions[currentUser.id] = emoji;
-            }
-
-            return newReactions;
-          });
-
-          // Also update the message in parent state, but this won't cause re-render here
-          // due to memoization and use of local state
-          setMessages((prevMessages) => {
-            return prevMessages.map((msg) => {
-              if (msg.id === initialMessage.id) {
-                // Toggle emoji reaction
-                const newReactions = { ...msg.reactions };
-                if (newReactions[currentUser.id] === emoji) {
-                  delete newReactions[currentUser.id];
-                } else {
-                  newReactions[currentUser.id] = emoji;
-                }
-                return { ...msg, reactions: newReactions };
-              }
-              return msg;
-            });
-          });
-
-          // Close picker after selecting
-          setIsEmojiPickerActive(false);
-
-          // Enhanced scroll position restoration taking height changes into account
-          const restoreScroll = () => {
-            if (chatContainer) {
-              // Calculate height difference to adjust scroll position
-              const newScrollHeight = chatContainer.scrollHeight;
-              const heightDiff = newScrollHeight - prevScrollHeight;
-
-              // Adjust scroll position based on height changes
-              chatContainer.scrollTop = prevScrollPosition + heightDiff;
-            }
-          };
-
-          // Apply multiple timeouts with different delays to ensure it works
-          // across different browsers and rendering scenarios
-          setTimeout(restoreScroll, 0); // Immediate
-          setTimeout(restoreScroll, 10); // Short delay
-          setTimeout(restoreScroll, 50); // Medium delay
-          setTimeout(restoreScroll, 100); // Longer delay
-        },
-        [currentUser, initialMessage.id, messagesEndRef]
-      );
+        // Call the parent handler
+        handleEmojiReaction(initialMessage.id, emoji);
+        setIsEmojiPickerActive(false);
+      };
 
       return (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, ease: "easeOut" }}
-          style={{
-            willChange: "transform, opacity",
-            containIntrinsicSize: "0 80px",
-            contain: "layout",
-            transform: "translateZ(0)",
-          }}
-          className={`mb-4 ${isCurrentUser ? "flex flex-col items-end" : "flex flex-col items-start"}`}
-          layoutId={`message-${initialMessage.id}`}
+          transition={{ duration: 0.3 }}
+          className={`flex items-start space-x-2 mb-4 group ${isCurrentUser ? "flex-row-reverse" : ""}`}
+          onHoverStart={() => setIsHovered(true)}
+          onHoverEnd={() => setIsHovered(false)}
         >
-          <div className="flex items-start max-w-[80%]">
-            {!isCurrentUser && (
-              <img
-                src={sender.avatar}
-                alt={sender.name}
-                className="h-8 w-8 rounded-full mr-2 mt-1"
-                style={{
-                  contain: "layout",
-                  willChange: "transform",
-                }}
+          <div className="relative">
+            <Image
+              src={sender.avatar}
+              alt={sender.name}
+              width={32}
+              height={32}
+              className="h-8 w-8 rounded-full flex-shrink-0 transition-transform duration-200 hover:scale-110"
+            />
+            {sender.status === "online" && (
+              <motion.div
+                className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-green-500 border-2 border-white dark:border-gray-800"
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ duration: 0.2 }}
               />
             )}
-          <div
-  className={`px-4 py-2 rounded-2xl cursor-pointer 
-    ${
-      isCurrentUser
-        ? "bg-blue-500"  // Changed from gradient to solid blue
-        : darkMode
-          ? "bg-gray-700"
-          : "bg-gray-100"
-    }
-    shadow-sm hover:shadow-md transition-shadow duration-200
-    relative group`}
-  onClick={handleEmojiPickerToggle}
->
-  {!isCurrentUser && (
-    <div className="font-semibold text-sm mb-1">{sender.name}</div>
-  )}
-  <p className={`text-sm ${isCurrentUser ? "text-white" : ""}`}>{initialMessage.text}</p>
-  <div
-    className={`text-xs mt-1 ${
-      isCurrentUser
-        ? "text-blue-200" 
-        : darkMode
-          ? "text-yellow-400"
-          : "text-gray-500"
-    }`}
-  >
-    {formatTimestamp(initialMessage.timestamp)}
-  </div>
-</div>
-
-
-            <div className="mt-2 ml-2">
-              {isCurrentUser && (
-                <img
-                  src={sender.avatar}
-                  alt={sender.name}
-                  className="h-8 w-8 rounded-full"
-                  style={{ contain: "layout" }}
-                />
-              )}
-            </div>
           </div>
 
-          {/* Emoji reactions - using local state instead of props */}
-          {Object.keys(localReactions).length > 0 && (
-            <div
-              className={`flex mt-1 space-x-1 ${
-                isCurrentUser ? "justify-end mr-10" : "justify-start ml-10"
-              }`}
-            >
-              {Object.entries(localReactions).map(([userId, emoji]) => (
-                <motion.div
-                  key={userId}
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  className={`rounded-full px-2 py-1 ${
-                    darkMode ? "bg-gray-700" : "bg-gray-100"
-                  }`}
-                  title={getUserById(userId)?.name || ""}
-                  style={{ contain: "layout", willChange: "transform" }}
-                >
-                  <span className="text-sm">{emoji}</span>
-                </motion.div>
-              ))}
-            </div>
-          )}
-
-          {/* Emoji picker with local visibility state */}
-          {isEmojiPickerActive && (
+          <div
+            className={`flex flex-col ${isCurrentUser ? "items-end" : "items-start"} max-w-[70%]`}
+          >
             <motion.div
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              className={`p-2 rounded-lg shadow-lg ${
-                darkMode ? "bg-gray-700" : "bg-gray-100"
-              }`}
-              style={{
-                position: "relative",
-                marginTop: "8px",
-                marginRight: isCurrentUser ? "10px" : "0",
-                marginLeft: isCurrentUser ? "0" : "10px",
-                zIndex: 10,
-                contain: "layout",
-                willChange: "transform",
-              }}
-              onClick={(e) => e.stopPropagation()}
+              className={`px-4 py-2 rounded-2xl ${
+                isCurrentUser
+                  ? darkMode
+                    ? "bg-blue-600 text-white"
+                    : "bg-blue-500 text-white"
+                  : darkMode
+                    ? "bg-gray-700 text-white"
+                    : "bg-gray-100 text-gray-800"
+              } shadow-sm hover:shadow-md transition-shadow duration-200 cursor-pointer`}
+              whileHover={{ scale: 1.02 }}
+              transition={{ type: "spring", stiffness: 400, damping: 30 }}
+              onClick={() => setIsEmojiPickerActive(!isEmojiPickerActive)}
             >
-              <div className="flex space-x-2">
-                {emojis.map((emoji) => (
-                  <button
-                    key={emoji}
-                    className={`text-xl p-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded ${
-                      currentUser && localReactions[currentUser.id] === emoji
-                        ? "bg-blue-100 dark:bg-blue-900"
-                        : ""
-                    }`}
-                    style={{ contain: "layout" }}
-                    onClick={() => handleEmojiSelection(emoji)}
+              <p className="whitespace-pre-wrap break-words text-sm md:text-base">
+                {initialMessage.text}
+              </p>
+
+              {/* Message Status */}
+              <div
+                className={`flex items-center justify-end space-x-1 mt-1 text-xs ${
+                  isCurrentUser ? "text-blue-200" : "text-gray-400"
+                }`}
+              >
+                {isCurrentUser && (
+                  <motion.span
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.2 }}
                   >
-                    {emoji}
-                  </button>
-                ))}
+                    {initialMessage.status === "sent" && "✓"}
+                    {initialMessage.status === "delivered" && "✓✓"}
+                    {initialMessage.status === "read" && (
+                      <span className="text-blue-400">✓✓</span>
+                    )}
+                  </motion.span>
+                )}
               </div>
             </motion.div>
-          )}
 
-          {/* Message status indicators */}
-          {isCurrentUser && (
-            <div className="absolute -right-4 bottom-0 text-xs text-gray-500 dark:text-gray-400">
-              {initialMessage.status === "sent" && "✓"}
-              {initialMessage.status === "delivered" && "✓✓"}
-              {initialMessage.status === "read" && (
-                <span className="text-blue-500">✓✓</span>
-              )}
-            </div>
-          )}
+            {/* Emoji Picker */}
+            {isEmojiPickerActive && (
+              <motion.div
+                initial={{ scale: 0.5, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.5, opacity: 0 }}
+                className={`mt-2 p-2 rounded-lg shadow-lg ${
+                  darkMode ? "bg-gray-800" : "bg-white"
+                } flex space-x-2 z-10`}
+              >
+                {emojis.map((emoji) => (
+                  <motion.button
+                    key={emoji}
+                    whileHover={{ scale: 1.2 }}
+                    whileTap={{ scale: 0.9 }}
+                    className={`w-8 h-8 rounded-full flex items-center justify-center text-xl
+                  ${darkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleEmojiClick(emoji);
+                    }}
+                  >
+                    {emoji}
+                  </motion.button>
+                ))}
+              </motion.div>
+            )}
 
-          {/* Message context menu */}
-          <motion.div whileHover={{ scale: 1.02 }} className="relative">
-            <div
-              className="absolute -top-3 right-0 opacity-0 group-hover:opacity-100 
-              transition-opacity duration-200"
+            {/* Timestamp with hover effect */}
+            <motion.span
+              className={`text-xs text-gray-500 mt-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200`}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: isHovered ? 1 : 0 }}
             >
-              <button className="p-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-full">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-4 w-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <circle cx="12" cy="6" r="2" fill="currentColor" />
-                  <circle cx="12" cy="12" r="2" fill="currentColor" />
-                  <circle cx="12" cy="18" r="2" fill="currentColor" />
-                </svg>
-              </button>
-            </div>
-          </motion.div>
+              {formatTimestamp(initialMessage.timestamp)}
+            </motion.span>
+
+            {/* Reactions */}
+            {Object.keys(localReactions).length > 0 && (
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                className={`flex flex-wrap gap-1 mt-1 ${isCurrentUser ? "justify-end" : "justify-start"}`}
+              >
+                {Object.entries(localReactions).map(([userId, emoji]) => (
+                  <motion.span
+                    key={`${initialMessage.id}-${userId}`}
+                    className="inline-flex items-center justify-center h-5 min-w-[20px] bg-gray-100 dark:bg-gray-700 rounded-full px-1 text-xs"
+                    whileHover={{ scale: 1.2 }}
+                    layout
+                  >
+                    {emoji}
+                  </motion.span>
+                ))}
+              </motion.div>
+            )}
+          </div>
         </motion.div>
       );
     }
@@ -1655,6 +1560,7 @@ const ChatApp = memo(() => {
                 currentUser={currentUser}
                 messagesEndRef={messagesEndRef}
                 formatTimestamp={formatTimestamp}
+                handleEmojiReaction={handleEmojiReaction}
               />
             ))}
             <div ref={messagesEndRef} />
@@ -1761,12 +1667,12 @@ const ChatApp = memo(() => {
 
   // Footer Component
   const Footer = () => {
-    const [year,setYear] = useState(0);
+    const [year, setYear] = useState(0);
     useEffect(() => {
       const currentYear = new Date().getFullYear();
       setYear(currentYear);
     }, []);
-  
+
     return (
       <div
         className={`py-3 px-4 flex items-center ${
@@ -1784,7 +1690,7 @@ const ChatApp = memo(() => {
       </div>
     );
   };
-  
+
   // Login Modal Component
   const LoginModal = () => {
     return (
@@ -1869,9 +1775,11 @@ const ChatApp = memo(() => {
               <div className="space-y-6">
                 {currentUser && (
                   <div className="flex items-center space-x-4">
-                    <img
+                    <Image
                       src={currentUser.avatar}
                       alt={currentUser.name}
+                      width={64}
+                      height={64}
                       className="h-16 w-16 rounded-full"
                     />
                     <div>
@@ -2011,17 +1919,6 @@ const ChatApp = memo(() => {
   }
 
   // Now render the full component, which will only happen on the client
-  
-    if(!isLoading) {
-        return (
-            <div className="min-h-screen flex items-center justify-center bg-white text-gray-800">
-            <div className="flex flex-col items-center">
-                <div className="text-3xl mb-4">💬</div>
-                <div className="text-xl font-bold">Loading chat...</div>
-            </div>
-            </div>
-        );
-        }
 
   return (
     <div
