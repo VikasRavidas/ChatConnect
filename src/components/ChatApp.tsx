@@ -955,8 +955,13 @@ const ChatApp = memo(() => {
 
   // Logout user
   const handleLogout = () => {
-    setCurrentUser(null);
-    setShowLoginModal(true);
+    // First close the settings modal
+    setShowSettingsModal(false);
+    // Add a small delay to allow the settings modal animation to complete
+    setTimeout(() => {
+      setCurrentUser(null);
+      setShowLoginModal(true);
+    }, 150);
   };
 
   // Keyboard shortcuts
