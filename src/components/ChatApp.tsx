@@ -21,24 +21,162 @@ const poppins = Poppins({
 
 // Wrap the entire component with memo to prevent unnecessary re-renders
 const ChatApp = memo(() => {
-  // Add a state to track if component is mounted (client-side only)
-  const [messageId, setMessageId] = useState("");
+  // Create useId for stable IDs across renders
+  const stableIdRef = useRef<number>(0);
   const [isLoading, setIsLoading] = useState(false);
-
-  useEffect(() => {
-    setMessageId(`msg-${Date.now()}-${Math.floor(Math.random() * 1000)}`);
-  }, []);
   const [isMounted, setIsMounted] = useState(false);
-  // Add state for auto-scroll button
-  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
-  // Use useEffect to set mounted state after initial render (client-side only)
+
+  // Generate stable IDs without using Date.now() or Math.random()
+  const generateStableId = useCallback((prefix: string) => {
+    stableIdRef.current += 1;
+    return `${prefix}-${stableIdRef.current}`;
+  }, []);
+
+  // Use useEffect to handle client-side initialization
   useEffect(() => {
     setIsMounted(true);
+    setIsLoading(false);
   }, []);
 
+  // Mock data initialization with stable IDs
+  const mockUsers: User[] = useMemo(
+    () => [
+      {
+        id: "user1",
+        name: "Alex Johnson",
+        avatar: "https://randomuser.me/api/portraits/men/32.jpg",
+        status: "online",
+        isTyping: false,
+      },
+      {
+        id: "user2",
+        name: "Samantha Lee",
+        avatar: "https://randomuser.me/api/portraits/women/44.jpg",
+        status: "online",
+        isTyping: false,
+      },
+      {
+        id: "user3",
+        name: "Michael Chen",
+        avatar: "https://randomuser.me/api/portraits/men/59.jpg",
+        status: "brb",
+        isTyping: false,
+      },
+      {
+        id: "user4",
+        name: "Jessica Taylor",
+        avatar: "https://randomuser.me/api/portraits/women/16.jpg",
+        status: "busy",
+        isTyping: false,
+      },
+      {
+        id: "user5",
+        name: "David Wilson",
+        avatar: "https://randomuser.me/api/portraits/men/7.jpg",
+        status: "offline",
+        lastSeen: new Date(Date.now() - 3600000),
+        isTyping: false,
+      },
+    ],
+    []
+  );
+
+  const mockMessages: Message[] = useMemo(
+    () =>
+      [
+        {
+          id: "msg1",
+          senderId: "user1",
+          text: "Hey everyone! How's it going?",
+          timestamp: new Date(2025, 4, 5, 10, 0), // Use fixed date for SSR
+          reactions: { user2: "👍", user4: "❤️" },
+          status: "sent",
+        },
+        {
+          id: "msg2",
+          senderId: "user2",
+          text: "Pretty good! Working on that new project. What about you?",
+          timestamp: new Date(2025, 4, 5, 10, 5),
+          reactions: {},
+          status: "sent",
+        },
+        {
+          id: "msg3",
+          senderId: "user3",
+          text: "I'm just taking a quick break. brb in 10 minutes!",
+          timestamp: new Date(2025, 4, 5, 10, 10),
+          reactions: { user1: "👍" },
+          status: "sent",
+        },
+        {
+          id: "msg4",
+          senderId: "user1",
+          text: "No worries, take your time!",
+          timestamp: new Date(2025, 4, 5, 10, 15),
+          reactions: {},
+          status: "sent",
+        },
+        {
+          id: "msg5",
+          senderId: "user4",
+          text: "Hey can someone help me with the new API documentation?",
+          timestamp: new Date(2025, 4, 5, 10, 20),
+          reactions: {},
+          status: "sent",
+        },
+        {
+          id: "msg6",
+          senderId: "user2",
+          text: "I can help! Give me a sec to find my notes.",
+          timestamp: new Date(2025, 4, 5, 10, 25),
+          reactions: { user4: "🙏" },
+          status: "sent",
+        },
+        {
+          id: "msg7",
+          senderId: "user1",
+          text: "Has anyone seen the latest deployment? Looks like there might be an issue with the authentication module.",
+          timestamp: new Date(2025, 4, 5, 10, 30),
+          reactions: { user2: "😮" },
+          status: "sent",
+        },
+        {
+          id: "msg8",
+          senderId: "user4",
+          text: "I'm checking it now. Will update everyone in a few minutes when I know more.",
+          timestamp: new Date(2025, 4, 5, 10, 35),
+          reactions: { user1: "👍", user2: "👍" },
+          status: "sent",
+        },
+      ] as Message[],
+    []
+  );
+
+  // Initialize state only after mount
   useEffect(() => {
-    setIsLoading(true);
-  }, []);
+    if (isMounted) {
+      setUsers(mockUsers);
+      setMessages(mockMessages);
+    }
+  }, [isMounted, mockUsers, mockMessages]);
+
+  // Update initial message timestamps on client
+  useEffect(() => {
+    if (isMounted) {
+      setMessages((prevMessages) =>
+        prevMessages.map((msg, index) => ({
+          ...msg,
+          timestamp: new Date(
+            Date.now() - (prevMessages.length - index) * 300000
+          ),
+        }))
+      );
+    }
+  }, [isMounted]);
+
+  // Add state for auto-scroll button
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+
   // TypeScript Interfaces
   interface User {
     id: string;
@@ -394,131 +532,6 @@ const ChatApp = memo(() => {
   // Emojis for reactions
   const emojis = useMemo(() => ["👍", "❤️", "😂", "😮", "😢", "😡"], []);
 
-  // Mock data for users
-  const mockUsers: User[] = useMemo(
-    () => [
-      {
-        id: "user1",
-        name: "Alex Johnson",
-        avatar: "https://randomuser.me/api/portraits/men/32.jpg",
-        status: "online",
-        isTyping: false,
-      },
-      {
-        id: "user2",
-        name: "Samantha Lee",
-        avatar: "https://randomuser.me/api/portraits/women/44.jpg",
-        status: "online",
-        isTyping: false,
-      },
-      {
-        id: "user3",
-        name: "Michael Chen",
-        avatar: "https://randomuser.me/api/portraits/men/59.jpg",
-        status: "brb",
-        isTyping: false,
-      },
-      {
-        id: "user4",
-        name: "Jessica Taylor",
-        avatar: "https://randomuser.me/api/portraits/women/16.jpg",
-        status: "busy",
-        isTyping: false,
-      },
-      {
-        id: "user5",
-        name: "David Wilson",
-        avatar: "https://randomuser.me/api/portraits/men/7.jpg",
-        status: "offline",
-        lastSeen: new Date(Date.now() - 3600000),
-        isTyping: false,
-      },
-    ],
-    []
-  );
-
-  // Mock chat messages
-  const mockMessages: Message[] = useMemo(
-    () =>
-      [
-        {
-          id: "msg1",
-          senderId: "user1",
-          text: "Hey everyone! How's it going?",
-          timestamp: new Date(Date.now() - 3600000 * 3),
-          reactions: { user2: "👍", user4: "❤️" },
-          status: "sent",
-        },
-        {
-          id: "msg2",
-          senderId: "user2",
-          text: "Pretty good! Working on that new project. What about you?",
-          timestamp: new Date(Date.now() - 3600000 * 2.5),
-          reactions: {},
-          status: "sent",
-        },
-        {
-          id: "msg3",
-          senderId: "user3",
-          text: "I'm just taking a quick break. brb in 10 minutes!",
-          timestamp: new Date(Date.now() - 3600000 * 2),
-          reactions: { user1: "👍" },
-          status: "sent",
-        },
-        {
-          id: "msg4",
-          senderId: "user1",
-          text: "No worries, take your time!",
-          timestamp: new Date(Date.now() - 3600000 * 1.8),
-          reactions: {},
-          status: "sent",
-        },
-        {
-          id: "msg5",
-          senderId: "user4",
-          text: "Hey can someone help me with the new API documentation?",
-          timestamp: new Date(Date.now() - 3600000 * 1.5),
-          reactions: {},
-          status: "sent",
-        },
-        {
-          id: "msg6",
-          senderId: "user2",
-          text: "I can help! Give me a sec to find my notes.",
-          timestamp: new Date(Date.now() - 3600000 * 1.2),
-          reactions: { user4: "🙏" },
-          status: "sent",
-        },
-        {
-          id: "msg7",
-          senderId: "user1",
-          text: "Has anyone seen the latest deployment? Looks like there might be an issue with the authentication module.",
-          timestamp: new Date(Date.now() - 3600000 * 1),
-          reactions: { user2: "😮" },
-          status: "sent",
-        },
-        {
-          id: "msg8",
-          senderId: "user4",
-          text: "I'm checking it now. Will update everyone in a few minutes when I know more.",
-          timestamp: new Date(Date.now() - 3600000 * 0.5),
-          reactions: { user1: "👍", user2: "👍" },
-          status: "sent",
-        },
-      ] as Message[],
-    []
-  );
-
-  // Initialize with mock data - client-side only
-  useEffect(() => {
-    if (isMounted) {
-      setUsers(mockUsers);
-      setMessages(mockMessages);
-
-      // No longer force scrolling here since ChatWindow handles it
-    }
-  }, [isMounted, mockMessages, mockUsers]);
-
   // Explicitly scroll to bottom (used after sending messages)
   const scrollToBottom = useCallback(() => {
     requestAnimationFrame(() => {
@@ -578,8 +591,9 @@ const ChatApp = memo(() => {
     (name: string) => {
       if (!isMounted) return; // Skip if not mounted yet (SSR)
 
-      // Use a more stable ID generation
-      const userId = `user-${name.toLowerCase().replace(/\s+/g, "-")}-${Date.now()}`;
+      const userId = generateStableId(
+        `user-${name.toLowerCase().replace(/\s+/g, "-")}`
+      );
       const avatarIndex = name.length % 60; // Deterministic avatar based on name length
 
       const newUser: User = {
@@ -594,7 +608,7 @@ const ChatApp = memo(() => {
       setShowLoginModal(false);
       chatInputRef.current?.focus();
     },
-    [isMounted]
+    [isMounted, generateStableId]
   );
 
   // Update typing status
@@ -751,7 +765,7 @@ const ChatApp = memo(() => {
       const responseText = responses[responseIndex];
 
       const newMessage: Message = {
-        id: `msg-response-${Date.now()}`,
+        id: generateStableId("msg-response"),
         senderId: respondingUser.id,
         text: responseText,
         timestamp: new Date(),
@@ -784,6 +798,7 @@ const ChatApp = memo(() => {
     updateUserTypingStatus,
     users,
     handleEmojiReaction,
+    generateStableId,
   ]);
 
   // Update the sendMessage function to work with the new component
@@ -793,7 +808,7 @@ const ChatApp = memo(() => {
         return;
       }
 
-      const messageId = `msg-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+      const messageId = generateStableId("msg");
       const newMessage: Message = {
         id: messageId,
         senderId: currentUser.id,
@@ -826,6 +841,7 @@ const ChatApp = memo(() => {
       simulateResponse,
       typingTimeout,
       updateUserTypingStatus,
+      generateStableId,
     ]
   );
 
@@ -1370,7 +1386,7 @@ const ChatApp = memo(() => {
           </div>
 
           <div
-            className={`flex flex-col ${isCurrentUser ? "items-end" : "items-start"} max-w-[70%]`}
+            className={`flex flex-col ${isCurrentUser ? "items-end" : "items-start"} max-w-[70%`}
           >
             <motion.div
               className={`px-4 py-2 rounded-2xl ${
