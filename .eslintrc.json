@@ -1,0 +1,15 @@
+{
+  "extends": ["next/core-web-vitals", "plugin:@typescript-eslint/recommended"],
+  "rules": {
+    "react/display-name": "off",
+    "@typescript-eslint/no-unused-vars": [
+      "error",
+      {
+        "argsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_"
+      }
+    ],
+    "@next/next/no-img-element": "off",
+    "react-hooks/exhaustive-deps": "warn"
+  }
+}
