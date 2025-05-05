@@ -159,7 +159,7 @@ const ChatApp = memo(() => {
       );
 
       return (
-        <div className="flex items-center">
+        <div className="flex items-center relative">
           <input
             ref={inputRef}
             type="text"
@@ -174,30 +174,43 @@ const ChatApp = memo(() => {
             }}
             onKeyDown={handleKeyDown}
             onFocus={(e) => {
-              // Prevent auto-scrolling when focusing the input
               e.preventDefault();
+              // Scroll the chat container up when keyboard opens on mobile
+              if (window.innerWidth < 768) {
+                setTimeout(() => {
+                  window.scrollTo(0, 0);
+                  document.body.scrollTop = 0;
+                }, 100);
+              }
             }}
             autoFocus={!!currentUser}
-            className={`flex-1 px-4 py-2 border-y border-l rounded-l-full focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-              darkMode
-                ? "bg-gray-700 border-gray-600 text-white"
-                : "bg-white border-gray-300 text-gray-800"
+            className={`flex-1 px-3 sm:px-4 py-1.5 sm:py-2 text-base border-y border-l rounded-l-full focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+              isDarkMode
+                ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                : "bg-white border-gray-300 text-gray-800 placeholder-gray-500"
             }`}
-            style={{ willChange: "contents", transition: "all 0.2s ease-out" }}
+            style={{
+              willChange: "contents",
+              transition: "all 0.2s ease-out",
+              minHeight: "40px",
+              fontSize: "16px", // Prevent zoom on mobile
+            }}
           />
           <motion.button
-            className="px-4 py-2 bg-blue-500 text-white border-y border-r border-blue-500 rounded-r-full hover:bg-blue-600 focus:outline-none font-medium"
+            className="px-3 sm:px-4 py-1.5 sm:py-2 bg-blue-500 text-white border-y border-r border-blue-500 rounded-r-full hover:bg-blue-600 focus:outline-none font-medium min-h-[40px] min-w-[60px]"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={handleSendMessage}
-            style={{ color: "white", fontWeight: 600 }}
+            style={{ color: "white", fontWeight: 500 }}
           >
             Send
           </motion.button>
 
-          <div className="absolute -top-6 left-4 text-xs text-gray-500 dark:text-gray-400">
-            {localIsTyping && currentUser && "You are typing..."}
-          </div>
+          {localIsTyping && currentUser && (
+            <div className="absolute -top-6 left-4 text-xs text-gray-500 dark:text-gray-400 animate-fade-in">
+              You are typing...
+            </div>
+          )}
         </div>
       );
     }
@@ -1545,7 +1558,7 @@ const ChatApp = memo(() => {
         {/* Scrollable message area - only this should scroll */}
         <div
           ref={chatContainerRef}
-          className={`flex-1 p-4 overflow-y-auto min-h-0 ${
+          className={`flex-1 px-2 sm:px-4 py-2 sm:py-4 overflow-y-auto min-h-0 pb-safe-area-inset ${
             darkMode ? "bg-gray-800" : "bg-gray-50"
           }`}
           style={{
@@ -1555,9 +1568,10 @@ const ChatApp = memo(() => {
             backgroundColor: darkMode ? "#1f2937" : "#f9fafb",
             willChange: "scroll-position",
             contain: "size layout style paint",
+            paddingBottom: "env(safe-area-inset-bottom, 16px)",
           }}
         >
-          <div className="flex flex-col justify-end min-h-full space-y-4 pb-2">
+          <div className="flex flex-col justify-end min-h-full space-y-2 sm:space-y-4">
             {messages.map((message) => (
               <MessageComponent
                 key={message.id}
@@ -1569,54 +1583,24 @@ const ChatApp = memo(() => {
                 handleEmojiReaction={handleEmojiReaction}
               />
             ))}
-            <div ref={messagesEndRef} />
+            <div ref={messagesEndRef} className="h-4" />
           </div>
-
-          {/* Scroll to bottom button */}
-          {showScrollToBottom && (
-            <button
-              onClick={handleScrollToBottom}
-              className={`fixed bottom-20 right-6 p-2 rounded-full shadow-lg z-10 ${
-                darkMode ? "bg-gray-700" : "bg-white"
-              } text-blue-500 hover:text-blue-600 focus:outline-none transition-opacity duration-200`}
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-6 w-6"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M19 14l-7 7m0 0l-7-7m7 7V3"
-                />
-              </svg>
-            </button>
-          )}
         </div>
 
-        {/* Input area - fixed at bottom of chat window */}
-        <div
-          className={`flex-shrink-0 p-4 border-t ${
-            darkMode ? "border-gray-700" : "border-gray-200"
-          }`}
-        >
+        {/* Input area with reduced padding on mobile */}
+        <div className="flex-shrink-0 px-2 sm:px-4 py-2 sm:py-4 border-t relative">
           <ChatInput
             onSendMessage={handleSendMessage}
             isDarkMode={darkMode}
             currentUser={currentUser}
           />
 
-          <div className="flex justify-end mt-2 text-xs text-gray-500 dark:text-gray-400">
-            {/* Status buttons */}
-            <div className="flex space-x-3">
+          {/* Status buttons in a more compact layout for mobile */}
+          <div className="flex justify-end mt-1 sm:mt-2">
+            <div className="flex space-x-2 text-xs">
               <button
                 onClick={() => changeUserStatus("online")}
-                className={`px-3 py-1.5 rounded-full 
-                  flex items-center min-w-[72px] min-h-[28px] justify-center
+                className={`px-2 py-1 rounded-full flex items-center min-w-[60px] sm:min-w-[72px] h-6 sm:h-7 justify-center
                   ${darkMode ? "text-gray-300" : "text-gray-600"}
                   ${
                     currentUser?.status === "online"
@@ -1627,13 +1611,12 @@ const ChatApp = memo(() => {
                   }
                 `}
               >
-                <div className="h-2 w-2 rounded-full bg-green-500 mr-1.5"></div>
-                <span>Online</span>
+                <div className="h-1.5 w-1.5 sm:h-2 sm:w-2 rounded-full bg-green-500 mr-1"></div>
+                <span className="text-xs sm:text-sm">Online</span>
               </button>
               <button
                 onClick={() => changeUserStatus("brb")}
-                className={`px-3 py-1.5 rounded-full 
-                  flex items-center min-w-[72px] min-h-[28px] justify-center
+                className={`px-2 py-1 rounded-full flex items-center min-w-[60px] sm:min-w-[72px] h-6 sm:h-7 justify-center
                   ${darkMode ? "text-gray-300" : "text-gray-600"}
                   ${
                     currentUser?.status === "brb"
@@ -1644,13 +1627,12 @@ const ChatApp = memo(() => {
                   }
                 `}
               >
-                <div className="h-2 w-2 rounded-full bg-yellow-500 mr-1.5"></div>
-                <span>BRB</span>
+                <div className="h-1.5 w-1.5 sm:h-2 sm:w-2 rounded-full bg-yellow-500 mr-1"></div>
+                <span className="text-xs sm:text-sm">BRB</span>
               </button>
               <button
                 onClick={() => changeUserStatus("busy")}
-                className={`px-3 py-1.5 rounded-full 
-                  flex items-center min-w-[72px] min-h-[28px] justify-center
+                className={`px-2 py-1 rounded-full flex items-center min-w-[60px] sm:min-w-[72px] h-6 sm:h-7 justify-center
                   ${darkMode ? "text-gray-300" : "text-gray-600"}
                   ${
                     currentUser?.status === "busy"
@@ -1661,8 +1643,8 @@ const ChatApp = memo(() => {
                   }
                 `}
               >
-                <div className="h-2 w-2 rounded-full bg-red-500 mr-1.5"></div>
-                <span>Busy</span>
+                <div className="h-1.5 w-1.5 sm:h-2 sm:w-2 rounded-full bg-red-500 mr-1"></div>
+                <span className="text-xs sm:text-sm">Busy</span>
               </button>
             </div>
           </div>
