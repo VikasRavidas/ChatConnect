@@ -1601,8 +1601,8 @@ const ChatApp = memo(() => {
             currentUser={currentUser}
           />
 
-          {/* Status buttons in a more compact layout for mobile */}
-          <div className="flex justify-end mt-1 sm:mt-2">
+          {/* Status buttons - hidden on mobile */}
+          <div className="hidden sm:flex justify-end mt-1 sm:mt-2">
             <div className="flex space-x-2 text-xs">
               <button
                 onClick={() => changeUserStatus("online")}
